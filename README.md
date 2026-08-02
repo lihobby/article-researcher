@@ -1,211 +1,112 @@
-<p align="center">
-  <a href="" rel="noopener">
- <img width=200px height=200px src="assets/logo.svg" alt="logo"></a>
-</p>
+# Personalized Research Daily
 
-<h3 align="center">Zotero-arXiv-Daily</h3>
+每天从 PubMed、bioRxiv、medRxiv 和 arXiv 获取新论文，按照手写研究兴趣排序，使用兼容 OpenAI API 的模型生成中文摘要，并通过邮件推送。Zotero 仍作为可选的兴趣来源保留，但默认不需要 Zotero。
 
-<div align="center">
+## 当前功能
 
-  [![Status](https://img.shields.io/badge/status-active-success.svg)]()
-  ![Stars](https://img.shields.io/github/stars/TideDra/zotero-arxiv-daily?style=flat)
-  [![GitHub Issues](https://img.shields.io/github/issues/TideDra/zotero-arxiv-daily)](https://github.com/TideDra/zotero-arxiv-daily/issues)
-  [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/TideDra/zotero-arxiv-daily)](https://github.com/TideDra/zotero-arxiv-daily/pulls)
-  [![License](https://img.shields.io/github/license/TideDra/zotero-arxiv-daily)](/LICENSE)
-  [<img src="https://api.gitsponsors.com/api/badge/img?id=893025857" height="20">](https://api.gitsponsors.com/api/badge/link?p=PKMtRut1dWWuC1oFdJweyDSvJg454/GkdIx4IinvBblaX2AY4rQ7FYKAK1ZjApoiNhYEeduIEhfeZVIwoIVlvcwdJXVFD2nV2EE5j6lYXaT/RHrcsQbFl3aKe1F3hliP26OMayXOoZVDidl05wj+yg==)
+- PubMed 期刊白名单，以及 bioRxiv、medRxiv、arXiv 多来源检索。
+- 按正向兴趣及权重排序，支持负向主题降权和最低相关分过滤。
+- 按 PMID、DOI、URL、标题进行跨来源和跨天去重。
+- 摘要语言、结构、提示词及长度均可在 YAML 中调整。
+- 邮件展示来源、期刊、日期、DOI、PMID、相关分和匹配兴趣。
+- 可随时将 `interest.provider` 改回 `zotero` 使用原 Zotero 资料库。
 
-</div>
+## GitHub Repository secrets
 
----
+在仓库的 **Settings → Secrets and variables → Actions → Repository secrets** 中配置：
 
-<p align="center"> Recommend new arxiv papers of your interest daily according to your Zotero library.
-    <br> 
-</p>
+| Secret | 必需 | 说明 |
+| --- | --- | --- |
+| `NCBI_EMAIL` | 是 | NCBI E-utilities 要求的联系邮箱，不会显示在邮件正文中。 |
+| `NCBI_API_KEY` | 否 | NCBI API key；不设置也能运行。 |
+| `SENDER` | 是 | 发件邮箱。 |
+| `SENDER_PASSWORD` | 是 | SMTP 授权码或密码。 |
+| `RECEIVER` | 是 | 收件邮箱。 |
+| `OPENAI_API_KEY` | 是 | 兼容 OpenAI API 的模型密钥。 |
+| `OPENAI_API_BASE` | 是 | API 地址，例如 `https://api.openai.com/v1`。 |
 
-> [!IMPORTANT]
-> Please keep an eye on this repo, and merge your forked repo in time when there is any update of this upstream, in order to enjoy new features and fix found bugs.
+默认 SMTP 是 QQ 邮箱。如果使用其他邮箱，请修改 [`config/custom.yaml`](config/custom.yaml) 中的 `smtp_server` 和 `smtp_port`。
 
-## 🧐 About <a name = "about"></a>
+不再需要 `ZOTERO_ID`、`ZOTERO_KEY` 或 Repository variable `CUSTOM_CONFIG`，除非主动切换回 Zotero 模式。
 
-> Track new scientific researches of your interest by just forking (and staring) this repo!😊
+## 个性化配置
 
-*Zotero-arXiv-Daily* finds arxiv papers that may attract you based on the context of your Zotero library, and then sends the result to your mailbox📮. It can be deployed as Github Action Workflow with **zero cost**, **no installation**, and **few configuration** of Github Action environment variables for daily **automatic** delivery.
+所有日常调整都在 [`config/custom.yaml`](config/custom.yaml) 中完成。
 
-## ✨ Features
-- Totally free! All the calculation can be done in the Github Action runner locally within its quota (for public repo).
-- AI-generated TL;DR for you to quickly pick up target papers.
-- Affiliations of the paper are resolved and presented.
-- Links of PDF and code implementation (if any) presented in the e-mail.
-- List of papers sorted by relevance with your recent research interest.
-- Fast deployment via fork this repo and set environment variables in the Github Action Page.
-- Support LLM API for generating TL;DR of papers.
-- Ignore unwanted Zotero papers using a list of glob patterns.
-- Support multiple sources of papers to retrieve:
-  - arxiv
-  - biorxiv
-  - medrxiv
+### 调整研究兴趣
 
-## 📷 Screenshot
-![screenshot](./assets/screenshot.png)
-
-## 🚀 Usage
-### Quick Start
-1. Fork (and star😘) this repo.
-![fork](./assets/fork.png)
-
-2. Set Github Action environment variables.
-![secrets](./assets/secrets.png)
-
-Below are all the secrets you need to set. They are invisible to anyone including you once they are set, for security.
-
-| Key |Description | Example |
-| :---  | :---  | :--- |
-| ZOTERO_ID  | User ID of your Zotero account. **User ID is not your username, but a sequence of numbers**Get your ID from [here](https://www.zotero.org/settings/security). You can find it at the position shown in this [screenshot](https://github.com/TideDra/zotero-arxiv-daily/blob/main/assets/userid.png). | 12345678  |
-| ZOTERO_KEY | An Zotero API key with read access. Get a key from [here](https://www.zotero.org/settings/security).  | AB5tZ877P2j7Sm2Mragq041H   |
-| SENDER | The email account of the SMTP server that sends you email. | abc@qq.com |
-| SENDER_PASSWORD | The password of the sender account. Note that it's not necessarily the password for logging in the e-mail client, but the authentication code for SMTP service. Ask your email provider for this.   | abcdefghijklmn |
-| RECEIVER | The e-mail address that receives the paper list. | abc@outlook.com |
-| OPENAI_API_KEY | API Key when using the API to access LLMs. You can get FREE API for using advanced open source LLMs in [SiliconFlow](https://cloud.siliconflow.cn/i/b3XhBRAm). | sk-xxx |
-| OPENAI_API_BASE | API URL when using the API to access LLMs. | https://api.siliconflow.cn/v1 |
-
-Then you should also set a public variable `CUSTOM_CONFIG` for your custom configuration.
-![vars](./assets/repo_var.png)
-![custom_config](./assets/config_var.png)
-Paste the following content into the value of `CUSTOM_CONFIG` variable:
 ```yaml
-zotero:
-  user_id: ${oc.env:ZOTERO_ID}
-  api_key: ${oc.env:ZOTERO_KEY}
-  include_path: null # Or e.g. ["2026/survey/**", "2026/reading-group/**"]
-
-email:
-  sender: ${oc.env:SENDER}
-  receiver: ${oc.env:RECEIVER}
-  smtp_server: smtp.qq.com
-  smtp_port: 465
-  sender_password: ${oc.env:SENDER_PASSWORD}
-
-llm:
-  api:
-    key: ${oc.env:OPENAI_API_KEY}
-    base_url: ${oc.env:OPENAI_API_BASE}
-  generation_kwargs:
-    model: gpt-4o-mini
-
-source:
-  arxiv:
-    category: ["cs.AI","cs.CV","cs.LG","cs.CL"]
-    include_cross_list: false # Set to true to include arXiv cross-list papers in these categories.
-
-executor:
-  debug: ${oc.env:DEBUG,null}
-  source: ['arxiv']
-```
-Set `source.arxiv.include_cross_list: true` if you want cross-listed papers included.
->[!NOTE]
-> `${oc.env:XXX,yyy}` means the value of the environment variable `XXX`. If the variable is not set, the default value `yyy` will be used.
-
-Here is the full configuration, `???` means the value must be filled in:
-```yaml
-zotero:
-  user_id: ??? # User ID of your Zotero account.
-  api_key: ??? # An Zotero API key with read access.
-  include_path: null # A list of glob patterns marking the Zotero collections that should be included. Example: ["2026/survey/**", "2026/reading-group/**"]
-
-source:
-  arxiv:
-    category: null # The categories of target arxiv papers. Find the abbr of your research area from [here](https://arxiv.org/category_taxonomy). Example: ["cs.AI","cs.CV","cs.LG","cs.CL"]
-    include_cross_list: false # Whether to include arXiv cross-list papers in subscribed categories. Example: true
-  biorxiv:
-    category: null # The categories of target biorxiv papers. Find categories from [here](https://www.biorxiv.org/). Example: ["biochemistry","animal behavior and cognition"]
-  medrxiv:
-    category: null # The categories of target medrxiv papers. Find categories from [here](https://www.medrxiv.org/) Example: ["psychiatry and clinical psychology", "neurology"]
-
-email:
-  sender: ??? # The email account of the SMTP server that sends you email. Example: abc@qq.com
-  receiver: ??? # The email account that receives the paper list. Example: abc@outlook.com
-  smtp_server: ??? # The SMTP server that sends the email. Ask your email provider (Gmail, QQ, Outlook, ...) for its SMTP server. Example: smtp.qq.com
-  smtp_port: ??? # The port of SMTP server. Example: 465
-  sender_password: ??? # The password of the sender account. Note that it's not necessarily the password for logging in the e-mail client, but the authentication code for SMTP service. Ask your email provider for this. Example: abcdefghijklmn
-
-llm:
-  api:
-    key: ??? # API Key of your LLM API. Example: sk-xxx
-    base_url: ??? # API URL of your LLM API. Example: https://api.openai.com/v1
-  generation_kwargs:
-  # Arguments for the LLM API. See [here](https://platform.openai.com/docs/api-reference/chat/create) for more details.
-    max_tokens: 16384
-    model: ???
-  language: English # Preferred language for the TL;DR. Example: English
-
-reranker:
-  local:
-    model: jinaai/jina-embeddings-v5-text-nano # The Hugging Face model name of the local embedding model. Example: jinaai/jina-embeddings-v5-text-nano
-    encode_kwargs:
-    # The kwargs for the encode method of the local embedding model. Details see [here](https://www.sbert.net/docs/package_reference/SentenceTransformer.html#sentence_transformers.SentenceTransformer.encode)
-      task: retrieval
-      prompt_name: document
-  api:
-    key: null # API Key of your embedding model API. Example: sk-xxx
-    base_url: null # API URL of your embedding model API. Example: https://api.openai.com/v1
-    model: null # The model name of the embedding model. Example: text-embedding-3-large
-    batch_size: null # The batch size for embedding API requests. Adjust to match your provider's limit. Example: 64
-
-executor:
-  debug: false # Whether to use debug mode. Example: true
-  send_empty: false # Whether to send an empty email even if no new papers today. Example: true
-  max_paper_num: 100 # The maximum number of the papers presented in the email. Example: 100
-  source: ??? # The sources of papers to retrieve. Example: ['arxiv','biorxiv','medrxiv']
-  reranker: local # The reranker to use. Example: 'local' or 'api'
+interest:
+  provider: manual
+  topics:
+    - name: Protein and peptide science
+      description: Protein engineering, peptide synthesis and biomolecular interactions.
+      weight: 1.0
+  negative_topics:
+    - name: Unrelated case reports
+      description: Single-patient reports without a broadly useful method or mechanism.
+      weight: 1.0
+  negative_penalty: 0.5
 ```
 
-That's all! Now you can test the workflow by manually triggering it:
-![test](./assets/test.png)
+`weight` 越大，主题对最终排序的影响越大；`negative_penalty` 越大，命中排除主题时降分越明显。
 
-> [!NOTE]
-> The Test-Workflow Action is the debug version of the main workflow (Send-emails-daily), which always retrieve 5 arxiv papers regardless of the date. While the main workflow will be automatically triggered everyday and retrieve new papers released yesterday. There is no new arxiv paper at weekends and holiday, in which case you may see "No new papers found" in the log of main workflow.
+### 调整摘要内容
 
-Then check the log and the receiver email after it finishes.
+修改 `llm.language`、`llm.summary.system_prompt` 和 `llm.summary.prompt_template`。模板支持：
 
-By default, the main workflow runs on 22:00 UTC everyday. You can change this time by editting the workflow config `.github/workflows/main.yml`.
+- `{language}`
+- `{title}`
+- `{journal}`
+- `{publication_date}`
+- `{matched_topics}`
+- `{abstract}`
+- `{full_text}`
 
-### Local Running
-Supported by [uv](https://github.com/astral-sh/uv), this workflow can easily run on your local device if uv is installed:
+因此可以自由增删“方法、定量结果、创新点、局限、与研究兴趣的关系”等栏目。
+
+### 调整来源和推送数量
+
+```yaml
+executor:
+  source: [pubmed, biorxiv, medrxiv, arxiv]
+  max_paper_num: 30
+  min_score: 2.5
+```
+
+- 在 `source.pubmed.journals` 中增删期刊。
+- 在相应的 `category` 中调整预印本分类。
+- `min_score` 越高，邮件越精简。首次使用建议根据几天的结果再调整。
+- `source.pubmed.lookback_days` 默认是 3 天，用于避免延迟收录；推送历史会阻止重复邮件。
+
+PubMed 并不完整覆盖所有化学和材料期刊。当前列表适合作为起点，后续可增加 Crossref、Europe PMC 或出版商 RSS 来源。
+
+## 运行
+
+在 Actions 页面可以运行：
+
+- **Check PubMed source**：只验证 PubMed 和 `NCBI_EMAIL`，不会调用 LLM，也不会发邮件。
+- **Send emails daily**：完整执行；也会在每天 22:00 UTC 自动运行。
+
+本地运行：
+
 ```bash
-# set all the environment variables
-# export ZOTERO_ID=xxxx
-# ...
-cd zotero-arxiv-daily
-uv run main.py
+export NCBI_EMAIL=you@example.com
+export SENDER=...
+export RECEIVER=...
+export SENDER_PASSWORD=...
+export OPENAI_API_KEY=...
+export OPENAI_API_BASE=...
+uv run src/zotero_arxiv_daily/main.py
 ```
 
-## 🚀 Sync with the latest version
-This project is in active development. You can subscribe this repo via `Watch` so that you can be notified once we publish new release.
+推送历史默认写入 `data/sent_history.json`。GitHub Actions 使用 cache 在不同运行之间恢复该文件；本地运行时也会自动保留。
 
-![Watch](./assets/subscribe_release.png)
+## 测试
 
+```bash
+uv run pytest
+python -m compileall -q src scripts tests
+```
 
-## 📖 How it works
-*Zotero-arXiv-Daily* firstly retrieves all the papers in your Zotero library and all the papers released in the previous day, via corresponding API. Then it calculates the embedding of each paper's abstract via an embedding model. The score of a paper is its weighted average similarity over all your Zotero papers (newer paper added to the library has higher weight). The TLDR of each paper is generated by LLM, given the text extracted by pymupdf4llm.
-
-## 📌 Limitations
-- The recommendation algorithm is very simple, it may not accurately reflect your interest. Welcome better ideas for improving the algorithm!
-- High `MAX_PAPER_NUM` can lead the execution time exceed the limitation of Github Action runner (6h per execution for public repo, and 2000 mins per month for private repo). Commonly, the quota given to public repo is definitely enough for individual use. If you have special requirements, you can deploy the workflow in your own server, or use a self-hosted Github Action runner, or pay for the exceeded execution time.
-
-
-## 📃 License
-Distributed under the AGPLv3 License. See `LICENSE` for detail.
-
-## ❤️ Acknowledgement
-- [pyzotero](https://github.com/urschrei/pyzotero)
-- [arxiv](https://github.com/lukasschwab/arxiv.py)
-- [sentence_transformers](https://github.com/UKPLab/sentence-transformers)
-
-## ☕ Buy Me A Coffee
-If you find this project helpful, welcome to sponsor me via WeChat or via [ko-fi](https://ko-fi.com/tidedra).
-![wechat_qr](assets/wechat_sponsor.JPG)
-
-
-## 🌟 Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=TideDra/zotero-arxiv-daily&type=Date)](https://star-history.com/#TideDra/zotero-arxiv-daily&Date)
+项目基于 [TideDra/zotero-arxiv-daily](https://github.com/TideDra/zotero-arxiv-daily)，使用 AGPLv3 许可证。

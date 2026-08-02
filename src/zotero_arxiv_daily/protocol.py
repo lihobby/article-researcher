@@ -8,6 +8,16 @@ from loguru import logger
 import json
 RawPaperItem = TypeVar('RawPaperItem')
 
+
+def _truncate_for_llm(text: str, max_tokens: int) -> str:
+    """Truncate with tiktoken when available, with a network-free fallback."""
+    try:
+        enc = tiktoken.encoding_for_model("gpt-4o")
+        return enc.decode(enc.encode(text)[:max_tokens])
+    except Exception as exc:
+        logger.warning(f"Tokenizer unavailable; using character-based truncation: {exc}")
+        return text[: max_tokens * 4]
+
 @dataclass
 class InterestTopic:
     """A research interest written and controlled by the user."""
@@ -32,34 +42,42 @@ class Paper:
     doi: Optional[str] = None
     pmid: Optional[str] = None
     article_types: Optional[list[str]] = None
+    matched_topics: Optional[list[str]] = None
 
     def _generate_tldr_with_llm(self, openai_client:OpenAI,llm_params:dict) -> str:
         lang = llm_params.get('language', 'English')
-        prompt = f"Given the following information of a paper, generate a one-sentence TLDR summary in {lang}:\n\n"
-        if self.title:
-            prompt += f"Title:\n {self.title}\n\n"
-
-        if self.abstract:
-            prompt += f"Abstract: {self.abstract}\n\n"
-
-        if self.full_text:
-            prompt += f"Preview of main content:\n {self.full_text}\n\n"
+        summary_config = llm_params.get("summary", {})
+        system_prompt = summary_config.get(
+            "system_prompt",
+            "You summarize scientific papers accurately for a researcher.",
+        )
+        prompt_template = summary_config.get(
+            "prompt_template",
+            "Summarize this paper in {language}.\nTitle: {title}\nAbstract: {abstract}\n"
+            "Preview: {full_text}\nMatched interests: {matched_topics}",
+        )
+        prompt = str(prompt_template).format(
+            language=lang,
+            title=self.title or "",
+            abstract=self.abstract or "",
+            full_text=self.full_text or "",
+            matched_topics=", ".join(self.matched_topics or []),
+            journal=self.journal or "",
+            publication_date=self.publication_date or "",
+        )
 
         if not self.full_text and not self.abstract:
             logger.warning(f"Neither full text nor abstract is provided for {self.url}")
             return "Failed to generate TLDR. Neither full text nor abstract is provided"
         
         # use gpt-4o tokenizer for estimation
-        enc = tiktoken.encoding_for_model("gpt-4o")
-        prompt_tokens = enc.encode(prompt)
-        prompt_tokens = prompt_tokens[:4000]  # truncate to 4000 tokens
-        prompt = enc.decode(prompt_tokens)
+        prompt = _truncate_for_llm(prompt, 4000)
         
         response = openai_client.chat.completions.create(
             messages=[
                 {
                     "role": "system",
-                    "content": f"You are an assistant who perfectly summarizes scientific paper, and gives the core idea of the paper to the user. Your answer should be in {lang}.",
+                    "content": f"{system_prompt}\nYour answer must be in {lang}.",
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -83,10 +101,7 @@ class Paper:
         if self.full_text is not None:
             prompt = f"Given the beginning of a paper, extract the affiliations of the authors in a python list format, which is sorted by the author order. If there is no affiliation found, return an empty list '[]':\n\n{self.full_text}"
             # use gpt-4o tokenizer for estimation
-            enc = tiktoken.encoding_for_model("gpt-4o")
-            prompt_tokens = enc.encode(prompt)
-            prompt_tokens = prompt_tokens[:2000]  # truncate to 2000 tokens
-            prompt = enc.decode(prompt_tokens)
+            prompt = _truncate_for_llm(prompt, 2000)
             affiliations = openai_client.chat.completions.create(
                 messages=[
                     {
@@ -121,3 +136,5 @@ class CorpusPaper:
     abstract: str
     added_date: datetime
     paths: list[str]
+    weight: Optional[float] = None
+    negative: bool = False

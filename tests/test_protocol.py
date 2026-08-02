@@ -55,6 +55,16 @@ def test_tldr_truncates_long_prompt(llm_params):
     assert result is not None
 
 
+def test_tldr_accepts_custom_prompt(llm_params):
+    client = make_stub_openai_client()
+    paper = make_sample_paper(journal="Test Journal", matched_topics=["Protein design"])
+    llm_params["summary"] = {
+        "system_prompt": "Custom scientific system prompt",
+        "prompt_template": "{title} | {journal} | {matched_topics} | {abstract}",
+    }
+    assert paper.generate_tldr(client, llm_params) is not None
+
+
 # ---------------------------------------------------------------------------
 # generate_affiliations
 # ---------------------------------------------------------------------------

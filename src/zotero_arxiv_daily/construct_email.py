@@ -1,5 +1,6 @@
 from .protocol import Paper
 import math
+from html import escape
 
 
 framework = """
@@ -52,13 +53,21 @@ def get_empty_html():
   """
   return block_template
 
-def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affiliations:str=None):
+def get_block_html(title:str, authors:str, rate:str, tldr:str, paper_url:str,
+                   affiliations:str=None, metadata:str="", matched_topics:str="",
+                   link_label:str="Article"):
     block_template = """
     <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-family: Arial, sans-serif; border: 1px solid #ddd; border-radius: 8px; padding: 16px; background-color: #f9f9f9;">
     <tr>
         <td style="font-size: 20px; font-weight: bold; color: #333;">
-            {title}
+            <a href="{paper_url}" style="color: #333; text-decoration: none;">{title}</a>
         </td>
+    </tr>
+    <tr>
+        <td style="font-size: 13px; color: #555; padding: 4px 0;">{metadata}</td>
+    </tr>
+    <tr>
+        <td style="font-size: 13px; color: #555; padding: 4px 0;"><strong>Matched interests:</strong> {matched_topics}</td>
     </tr>
     <tr>
         <td style="font-size: 14px; color: #666; padding: 8px 0;">
@@ -80,12 +89,15 @@ def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affi
 
     <tr>
         <td style="padding: 8px 0;">
-            <a href="{pdf_url}" style="display: inline-block; text-decoration: none; font-size: 14px; font-weight: bold; color: #fff; background-color: #d9534f; padding: 8px 16px; border-radius: 4px;">PDF</a>
+            <a href="{paper_url}" style="display: inline-block; text-decoration: none; font-size: 14px; font-weight: bold; color: #fff; background-color: #d9534f; padding: 8px 16px; border-radius: 4px;">{link_label}</a>
         </td>
     </tr>
 </table>
 """
-    return block_template.format(title=title, authors=authors,rate=rate, tldr=tldr, pdf_url=pdf_url, affiliations=affiliations)
+    return block_template.format(title=title, authors=authors, rate=rate, tldr=tldr,
+                                 paper_url=paper_url, affiliations=affiliations,
+                                 metadata=metadata, matched_topics=matched_topics,
+                                 link_label=link_label)
 
 def get_stars(score:float):
     full_star = '<span class="full-star">⭐</span>'
@@ -125,7 +137,24 @@ def render_email(papers:list[Paper]) -> str:
                 affiliations += ', ...'
         else:
             affiliations = 'Unknown Affiliation'
-        parts.append(get_block_html(p.title, authors, rate, p.tldr, p.pdf_url, affiliations))
+        metadata_parts = [p.source]
+        if p.journal:
+            metadata_parts.append(p.journal)
+        if p.publication_date:
+            metadata_parts.append(p.publication_date)
+        if p.doi:
+            metadata_parts.append(f"DOI: {p.doi}")
+        if p.pmid:
+            metadata_parts.append(f"PMID: {p.pmid}")
+        metadata = " · ".join(escape(str(item)) for item in metadata_parts)
+        matched_topics = ", ".join(escape(item) for item in (p.matched_topics or [])) or "—"
+        link = p.pdf_url or p.url
+        link_label = "PDF" if p.pdf_url else "Article"
+        parts.append(get_block_html(
+            escape(p.title), escape(authors), str(rate), escape(p.tldr or ""),
+            escape(link, quote=True), escape(affiliations), metadata,
+            matched_topics, link_label,
+        ))
 
     content = '<br>' + '</br><br>'.join(parts) + '</br>'
     return framework.replace('__CONTENT__', content)

@@ -16,7 +16,7 @@ PUBMED_XML = """<?xml version="1.0"?>
         <Journal><JournalIssue><PubDate><Year>2026</Year><Month>Aug</Month><Day>01</Day></PubDate></JournalIssue><Title>Nature Chemical Biology</Title></Journal>
         <ArticleTitle>A chemical biology discovery</ArticleTitle>
         <Abstract><AbstractText Label="BACKGROUND">Probe development.</AbstractText><AbstractText Label="RESULTS">A new target was found.</AbstractText></Abstract>
-        <AuthorList><Author><LastName>Smith</LastName><Initials>JA</Initials></Author></AuthorList>
+        <AuthorList><Author><LastName>Smith</LastName><Initials>JA</Initials><AffiliationInfo><Affiliation>Department of Chemistry, Example University</Affiliation></AffiliationInfo></Author></AuthorList>
         <PublicationTypeList><PublicationType>Journal Article</PublicationType></PublicationTypeList>
       </Article>
     </MedlineCitation>
@@ -42,6 +42,7 @@ def test_parse_pubmed_xml():
     assert records[0]["pmid"] == "12345678"
     assert records[0]["doi"] == "10.1000/example"
     assert records[0]["authors"] == ["Smith JA"]
+    assert records[0]["affiliations"] == ["Department of Chemistry, Example University"]
     assert "RESULTS: A new target was found." in records[0]["abstract"]
 
 

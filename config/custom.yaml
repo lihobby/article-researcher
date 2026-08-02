@@ -25,6 +25,12 @@ interest:
     - name: Biomimetic materials and bio-inspired science
       description: Biomimetic materials, bio-inspired design, smart materials, biomimicry algorithms, and nature-inspired engineering.
       weight: 0.5
+  negative_topics:
+    - name: Unrelated clinical case reports
+      description: Single-patient clinical case reports without a new method, material, mechanism, or broadly useful biological insight.
+      weight: 1.0
+  negative_penalty: 0.5
+  matched_topic_count: 3
 
 email:
   sender: ${oc.env:SENDER}
@@ -32,6 +38,7 @@ email:
   smtp_server: smtp.qq.com
   smtp_port: 465
   sender_password: ${oc.env:SENDER_PASSWORD}
+  subject: "个性化科研文献推送 {date}"
 
 llm:
   api:
@@ -39,6 +46,27 @@ llm:
     base_url: ${oc.env:OPENAI_API_BASE}
   generation_kwargs:
     model: gpt-4o-mini
+    max_tokens: 1200
+  language: Chinese
+  summary:
+    system_prompt: |-
+      你是一名严谨的化学、生物学和材料科学文献分析助手。只能依据给出的论文内容作答，不得补充论文中没有的信息；如果某项信息缺失，请明确说明。
+    prompt_template: |-
+      请用{language}分析下面的论文，并严格使用以下小标题：
+      【一句话结论】
+      【研究问题】
+      【方法】
+      【核心发现】
+      【创新与价值】说明它为什么与“匹配兴趣”相关
+      【局限与阅读建议】
+      总长度控制在500字以内，突出定量结果和真正的新意，避免泛泛复述背景。
+
+      标题：{title}
+      期刊：{journal}
+      发表日期：{publication_date}
+      匹配兴趣：{matched_topics}
+      摘要：{abstract}
+      正文预览：{full_text}
 
 source:
   pubmed:
@@ -64,7 +92,6 @@ source:
       - Cell Systems
       - Matter
       - Chem
-      - Angewandte Chemie International Edition
       - Advanced Materials
       - Advanced Functional Materials
       - Advanced Electronic Materials
@@ -96,7 +123,19 @@ source:
     email: ${oc.env:NCBI_EMAIL}
     api_key: ${oc.env:NCBI_API_KEY,null}
     max_results: 300
+    exclude_article_types: [Editorial, News, Comment, Correction, Retracted Publication]
+  arxiv:
+    category: [cs.AI, cs.LG, q-bio.BM, q-bio.MN, q-bio.QM, cond-mat.soft]
+    include_cross_list: true
+  biorxiv:
+    category: [biochemistry, bioengineering, bioinformatics, biophysics, synthetic biology]
+  medrxiv:
+    category: [neurology, health informatics]
 
 executor:
   debug: ${oc.env:DEBUG,null}
-  source: ['pubmed']
+  source: [pubmed, biorxiv, medrxiv, arxiv]
+  max_paper_num: 30
+  min_score: 2.5
+  history_path: data/sent_history.json
+  history_retention_days: 30

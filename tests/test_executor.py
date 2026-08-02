@@ -26,14 +26,16 @@ def test_fetch_manual_interest_corpus(config):
                 "weight": 1.0,
             }
         ]
+        config.interest.negative_topics = []
 
     executor = Executor.__new__(Executor)
     executor.config = config
     corpus = executor.fetch_interest_corpus()
 
-    assert len(corpus) == 10
+    assert len(corpus) == 1
     assert corpus[0].title == "Chemical proteomics"
     assert "proteome-wide" in corpus[0].abstract
+    assert corpus[0].weight == 1.0
 
 
 def test_manual_interest_requires_description(config):
@@ -46,6 +48,46 @@ def test_manual_interest_requires_description(config):
     executor.config = config
     with pytest.raises(ValueError, match="description cannot be empty"):
         executor.fetch_manual_interest_corpus()
+
+
+def test_manual_interest_includes_negative_topics(config):
+    from omegaconf import open_dict
+
+    with open_dict(config):
+        config.interest.provider = "manual"
+        config.interest.topics = [{"name": "Protein design", "description": "Designed proteins", "weight": 2.0}]
+        config.interest.negative_topics = [{"name": "Case reports", "description": "Single patient", "weight": 0.5}]
+
+    executor = Executor.__new__(Executor)
+    executor.config = config
+    corpus = executor.fetch_manual_interest_corpus()
+    assert len(corpus) == 2
+    assert corpus[0].weight == 2.0
+    assert corpus[1].negative is True
+
+
+def test_deduplicate_papers_uses_doi_and_title(config):
+    from tests.canned_responses import make_sample_paper
+
+    executor = Executor.__new__(Executor)
+    executor.config = config
+    first = make_sample_paper(title="Same Paper", doi="10.1000/SAME")
+    duplicate = make_sample_paper(source="pubmed", title="Same Paper", doi="10.1000/same")
+    other = make_sample_paper(title="Other Paper", doi="10.1000/other", url="https://example.com/other")
+    assert executor.deduplicate_papers([first, duplicate, other], {}) == [first, other]
+
+
+def test_sent_history_round_trip(config, tmp_path):
+    from omegaconf import open_dict
+    from tests.canned_responses import make_sample_paper
+
+    with open_dict(config.executor):
+        config.executor.history_path = str(tmp_path / "history.json")
+    executor = Executor.__new__(Executor)
+    executor.config = config
+    paper = make_sample_paper(doi="10.1000/history")
+    executor.save_sent_history({}, [paper])
+    assert "doi:10.1000/history" in executor.load_sent_history()
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +229,7 @@ def test_fetch_zotero_corpus_paper_with_zero_collections(config, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_run_end_to_end(config, monkeypatch):
+def test_run_end_to_end(config, monkeypatch, tmp_path):
     """Full pipeline: Zotero fetch -> filter -> retrieve -> rerank -> TLDR -> email."""
     import smtplib
 
@@ -206,6 +248,7 @@ def test_run_end_to_end(config, monkeypatch):
         config.executor.source = ["arxiv"]
         config.executor.reranker = "api"
         config.executor.send_empty = False
+        config.executor.history_path = str(tmp_path / "history.json")
 
     # 1. Stub pyzotero
     stub_zot = make_stub_zotero_client()
@@ -217,7 +260,7 @@ def test_run_end_to_end(config, monkeypatch):
     monkeypatch.setattr("zotero_arxiv_daily.reranker.api.OpenAI", lambda **kw: stub_client)
     retrieved = [
         make_sample_paper(title="E2E Paper 1", score=None),
-        make_sample_paper(title="E2E Paper 2", score=None),
+        make_sample_paper(title="E2E Paper 2", score=None, url="https://example.com/e2e-2"),
     ]
 
     # Import to register the arxiv retriever
@@ -248,7 +291,7 @@ def test_run_end_to_end(config, monkeypatch):
     assert "text/html" in email_body
 
 
-def test_run_no_papers_send_empty_false(config, monkeypatch):
+def test_run_no_papers_send_empty_false(config, monkeypatch, tmp_path):
     """When no papers are found and send_empty=false, no email is sent."""
     import smtplib
 
@@ -260,6 +303,7 @@ def test_run_no_papers_send_empty_false(config, monkeypatch):
         config.executor.source = ["arxiv"]
         config.executor.reranker = "api"
         config.executor.send_empty = False
+        config.executor.history_path = str(tmp_path / "history.json")
 
     stub_zot = make_stub_zotero_client()
     monkeypatch.setattr("zotero_arxiv_daily.executor.zotero.Zotero", lambda *a, **kw: stub_zot)
@@ -284,7 +328,7 @@ def test_run_no_papers_send_empty_false(config, monkeypatch):
     assert len(sent) == 0, "No email should be sent when no papers and send_empty=false"
 
 
-def test_run_no_papers_send_empty_true(config, monkeypatch):
+def test_run_no_papers_send_empty_true(config, monkeypatch, tmp_path):
     """When no papers are found and send_empty=true, empty email is sent."""
     import smtplib
 
@@ -296,6 +340,7 @@ def test_run_no_papers_send_empty_true(config, monkeypatch):
         config.executor.source = ["arxiv"]
         config.executor.reranker = "api"
         config.executor.send_empty = True
+        config.executor.history_path = str(tmp_path / "history.json")
 
     stub_zot = make_stub_zotero_client()
     monkeypatch.setattr("zotero_arxiv_daily.executor.zotero.Zotero", lambda *a, **kw: stub_zot)

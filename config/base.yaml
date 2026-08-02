@@ -4,7 +4,9 @@ interest:
     - name: Chemical biology
       description: Chemical probes, biomolecular mechanisms, and chemical approaches for studying biological systems.
       weight: 1.0
-  negative_topics: [] # Reserved for a later step; these topics will eventually lower a paper's score.
+  negative_topics: [] # Topics that lower a candidate's relevance score.
+  negative_penalty: 0.5
+  matched_topic_count: 3
 
 zotero:
   user_id: ??? # User ID of your Zotero account.
@@ -19,6 +21,7 @@ source:
     email: null # Contact email requested by NCBI. Can use ${oc.env:NCBI_EMAIL}.
     api_key: null # Optional NCBI API key. Can use ${oc.env:NCBI_API_KEY,null}.
     max_results: 300
+    exclude_article_types: [Editorial, News, Comment, Correction, Retracted Publication]
   arxiv:
     category: null # The categories of target arxiv papers. Find the abbr of your research area from [here](https://arxiv.org/category_taxonomy). Example: ["cs.AI","cs.CV","cs.LG","cs.CL"]
     include_cross_list: false # Whether to include arXiv cross-list papers in subscribed categories. Example: true
@@ -33,6 +36,7 @@ email:
   smtp_server: ??? # The SMTP server that sends the email. Ask your email provider (Gmail, QQ, Outlook, ...) for its SMTP server. Example: smtp.qq.com
   smtp_port: ??? # The port of SMTP server. Example: 465
   sender_password: ??? # The password of the sender account. Note that it's not necessarily the password for logging in the e-mail client, but the authentication code for SMTP service. Ask your email provider for this. Example: abcdefghijklmn
+  subject: "Daily Research Papers {date}"
 
 llm:
   api:
@@ -43,6 +47,17 @@ llm:
     max_tokens: 16384
     model: ???
   language: English # Preferred language for the TL;DR. Example: English
+  summary:
+    system_prompt: You are an accurate scientific literature analyst. Do not invent facts absent from the paper.
+    prompt_template: |-
+      Summarize the paper in {language} using these sections: research question, methods,
+      main findings, novelty and relevance, and limitations. Keep the answer concise.
+      Title: {title}
+      Journal: {journal}
+      Publication date: {publication_date}
+      Matched interests: {matched_topics}
+      Abstract: {abstract}
+      Preview of full text: {full_text}
 
 reranker:
   local:
@@ -61,5 +76,8 @@ executor:
   debug: false # Whether to use debug mode. Example: true
   send_empty: false # Whether to send an empty email even if no new papers today. Example: true
   max_paper_num: 100 # The maximum number of the papers presented in the email. Example: 100
+  min_score: 0
+  history_path: data/sent_history.json
+  history_retention_days: 30
   source: ??? # The sources of papers to retrieve. Example: ['arxiv','biorxiv','medrxiv']
   reranker: local # The reranker to use. Example: 'local' or 'api'

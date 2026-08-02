@@ -5,7 +5,10 @@ from .utils import glob_match
 from .retriever import get_retriever_cls
 from .protocol import CorpusPaper, InterestTopic
 import random
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+import json
+import re
 from .reranker import get_reranker_cls
 from .construct_email import render_email
 from .utils import send_email
@@ -62,24 +65,86 @@ class Executor:
                 raise ValueError(f"interest.topics[{index}].weight must be greater than 0")
             topics.append(InterestTopic(name=name, description=description, weight=weight))
 
-        # Repeat weighted topics so the existing weighted-average reranker can
-        # approximately respect user weights until the dedicated topic reranker
-        # is introduced in a later step.
         corpus: list[CorpusPaper] = []
         now = datetime.now()
         for topic in topics:
-            repeat_count = max(1, round(topic.weight * 10))
-            corpus.extend(
+            corpus.append(
                 CorpusPaper(
-                    title=topic.name,
-                    abstract=f"{topic.name}. {topic.description}",
-                    added_date=now,
-                    paths=["manual-interest"],
+                    title=topic.name, abstract=f"{topic.name}. {topic.description}",
+                    added_date=now, paths=["manual-interest"], weight=topic.weight,
                 )
-                for _ in range(repeat_count)
             )
+        for index, item in enumerate(self.config.interest.get("negative_topics", [])):
+            if isinstance(item, str):
+                name, description, weight = item, item, 1.0
+            else:
+                name = str(item.get("name", "")).strip()
+                description = str(item.get("description", name)).strip()
+                weight = float(item.get("weight", 1.0))
+            if not name or not description or weight <= 0:
+                raise ValueError(f"interest.negative_topics[{index}] must have a name, description, and positive weight")
+            corpus.append(CorpusPaper(
+                title=name, abstract=f"{name}. {description}", added_date=now,
+                paths=["manual-interest-negative"], weight=weight, negative=True,
+            ))
         logger.info(f"Loaded {len(topics)} manual research interests")
         return corpus
+
+    @staticmethod
+    def _paper_keys(paper) -> set[str]:
+        keys = set()
+        if paper.pmid:
+            keys.add(f"pmid:{paper.pmid.strip()}")
+        if paper.doi:
+            keys.add(f"doi:{paper.doi.strip().lower()}")
+        if paper.url:
+            keys.add(f"url:{paper.url.strip().rstrip('/').lower()}")
+        title = re.sub(r"[^a-z0-9]+", " ", paper.title.lower()).strip()
+        if title:
+            keys.add(f"title:{title}")
+        return keys
+
+    def _history_path(self) -> Path:
+        return Path(str(self.config.executor.get("history_path", "data/sent_history.json")))
+
+    def load_sent_history(self) -> dict[str, str]:
+        path = self._history_path()
+        if not path.exists():
+            return {}
+        try:
+            history = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning(f"Ignoring unreadable sent history {path}: {exc}")
+            return {}
+        cutoff = datetime.now(timezone.utc) - timedelta(days=int(self.config.executor.get("history_retention_days", 30)))
+        clean = {}
+        for key, value in history.items():
+            try:
+                if datetime.fromisoformat(value) >= cutoff:
+                    clean[key] = value
+            except (TypeError, ValueError):
+                continue
+        return clean
+
+    def deduplicate_papers(self, papers, history: dict[str, str]):
+        unique, seen = [], set(history)
+        for paper in papers:
+            keys = self._paper_keys(paper)
+            if keys & seen:
+                logger.info(f"Skipping duplicate or previously sent paper: {paper.title}")
+                continue
+            unique.append(paper)
+            seen.update(keys)
+        return unique
+
+    def save_sent_history(self, history: dict[str, str], papers) -> None:
+        timestamp = datetime.now(timezone.utc).isoformat()
+        for paper in papers:
+            for key in self._paper_keys(paper):
+                history[key] = timestamp
+        path = self._history_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(history, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
 
     def fetch_interest_corpus(self) -> list[CorpusPaper]:
         provider = self.config.interest.get("provider", "manual")
@@ -148,26 +213,39 @@ class Executor:
         all_papers = []
         for source, retriever in self.retrievers.items():
             logger.info(f"Retrieving {source} papers...")
-            papers = retriever.retrieve_papers()
+            try:
+                papers = retriever.retrieve_papers()
+            except Exception as exc:
+                logger.warning(f"Failed to retrieve {source}; continuing with other sources: {exc}")
+                continue
             if len(papers) == 0:
                 logger.info(f"No {source} papers found")
                 continue
             logger.info(f"Retrieved {len(papers)} {source} papers")
             all_papers.extend(papers)
         logger.info(f"Total {len(all_papers)} papers retrieved from all sources")
+        history = self.load_sent_history()
+        all_papers = self.deduplicate_papers(all_papers, history)
         reranked_papers = []
         if len(all_papers) > 0:
             logger.info("Reranking papers...")
             reranked_papers = self.reranker.rerank(all_papers, corpus)
+            minimum_score = float(self.config.executor.get("min_score", 0))
+            reranked_papers = [paper for paper in reranked_papers if paper.score is not None and paper.score >= minimum_score]
             reranked_papers = reranked_papers[:self.config.executor.max_paper_num]
             logger.info("Generating TLDR and affiliations...")
             for p in tqdm(reranked_papers):
                 p.generate_tldr(self.openai_client, self.config.llm)
-                p.generate_affiliations(self.openai_client, self.config.llm)
+                if p.affiliations is None:
+                    p.generate_affiliations(self.openai_client, self.config.llm)
+            if not reranked_papers and not self.config.executor.send_empty:
+                logger.info("No papers met the relevance threshold. No email will be sent.")
+                return
         elif not self.config.executor.send_empty:
             logger.info("No new papers found. No email will be sent.")
             return
         logger.info("Sending email...")
         email_content = render_email(reranked_papers)
         send_email(self.config, email_content)
+        self.save_sent_history(history, reranked_papers)
         logger.info("Email sent successfully")

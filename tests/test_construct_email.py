@@ -47,6 +47,21 @@ def test_render_email_no_affiliations():
     assert "Unknown Affiliation" in html
 
 
+def test_render_pubmed_metadata_and_article_link():
+    paper = make_sample_paper(
+        source="pubmed", pdf_url=None, url="https://pubmed.ncbi.nlm.nih.gov/123/",
+        journal="Nature Chemical Biology", publication_date="2026-Aug-01",
+        doi="10.1000/example", pmid="123", matched_topics=["Protein science"],
+        score=7.0, tldr="Summary",
+    )
+    html = render_email([paper])
+    assert "Nature Chemical Biology" in html
+    assert "PMID: 123" in html
+    assert "Protein science" in html
+    assert ">Article</a>" in html
+    assert 'href="None"' not in html
+
+
 def test_get_stars_low_score():
     assert get_stars(5.0) == ""
     assert get_stars(6.0) == ""

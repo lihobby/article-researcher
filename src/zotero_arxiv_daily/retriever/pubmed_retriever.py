@@ -57,6 +57,7 @@ def parse_pubmed_xml(xml_text: str) -> list[dict[str, Any]]:
         abstract = "\n".join(abstract_parts)
 
         authors = []
+        affiliations = []
         for author in article.findall("AuthorList/Author"):
             collective = _element_text(author.find("CollectiveName"))
             if collective:
@@ -67,6 +68,10 @@ def parse_pubmed_xml(xml_text: str) -> list[dict[str, Any]]:
             name = " ".join(part for part in (last, initials) if part)
             if name:
                 authors.append(name)
+            for affiliation in author.findall("AffiliationInfo/Affiliation"):
+                value = _element_text(affiliation)
+                if value and value not in affiliations:
+                    affiliations.append(value)
 
         doi = None
         for article_id in citation.findall(".//ArticleIdList/ArticleId"):
@@ -80,6 +85,7 @@ def parse_pubmed_xml(xml_text: str) -> list[dict[str, Any]]:
                 "title": title,
                 "abstract": abstract,
                 "authors": authors,
+                "affiliations": affiliations,
                 "journal": _element_text(article.find("Journal/Title")),
                 "publication_date": _publication_date(article),
                 "doi": doi,
@@ -114,7 +120,7 @@ class PubmedRetriever(BaseRetriever):
         return params
 
     def _retrieve_raw_papers(self) -> list[dict[str, Any]]:
-        journals = [str(journal) for journal in self.retriever_config.journals]
+        journals = list(dict.fromkeys(str(journal).strip() for journal in self.retriever_config.journals))
         journal_query = " OR ".join(f'"{journal}"[jour]' for journal in journals)
         search_params = {
             **self._common_params(),
@@ -147,6 +153,14 @@ class PubmedRetriever(BaseRetriever):
         )
         fetch_response.raise_for_status()
         records = parse_pubmed_xml(fetch_response.text)
+        excluded_types = {
+            str(item).casefold() for item in self.retriever_config.get("exclude_article_types", [])
+        }
+        if excluded_types:
+            records = [
+                record for record in records
+                if not ({item.casefold() for item in record["article_types"]} & excluded_types)
+            ]
         logger.info(f"PubMed returned {len(records)} articles with metadata")
         return records
 
@@ -165,4 +179,5 @@ class PubmedRetriever(BaseRetriever):
             doi=raw_paper["doi"],
             pmid=pmid,
             article_types=raw_paper["article_types"],
+            affiliations=raw_paper["affiliations"] or None,
         )

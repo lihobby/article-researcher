@@ -68,3 +68,21 @@ def test_rerank_single_candidate_single_corpus():
 def test_get_reranker_cls_unknown():
     with pytest.raises(ValueError, match="not found"):
         get_reranker_cls("nonexistent_reranker_xyz")
+
+
+def test_manual_topic_weights_and_negative_penalty():
+    from datetime import datetime
+    from omegaconf import OmegaConf
+    from zotero_arxiv_daily.protocol import CorpusPaper
+
+    corpus = [
+        CorpusPaper("High weight", "a", datetime.now(), [], weight=3.0),
+        CorpusPaper("Low weight", "b", datetime.now(), [], weight=1.0),
+        CorpusPaper("Unwanted", "c", datetime.now(), [], weight=1.0, negative=True),
+    ]
+    papers = [make_sample_paper(title="Candidate")]
+    reranker = StubReranker(np.array([[1.0, 0.0, 0.5]]))
+    reranker.config = OmegaConf.create({"interest": {"negative_penalty": 0.5, "matched_topic_count": 2}})
+    ranked = reranker.rerank(papers, corpus)
+    assert ranked[0].score == pytest.approx(5.0)
+    assert ranked[0].matched_topics == ["High weight", "Low weight"]
