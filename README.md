@@ -22,8 +22,7 @@
 | `SENDER` | 是 | 发件邮箱。 |
 | `SENDER_PASSWORD` | 是 | SMTP 授权码或密码。 |
 | `RECEIVER` | 是 | 收件邮箱。 |
-| `OPENAI_API_KEY` | 是 | 兼容 OpenAI API 的模型密钥。 |
-| `OPENAI_API_BASE` | 是 | API 地址，例如 `https://api.openai.com/v1`。 |
+| `GEMINI_API_KEY` | 是 | Google AI Studio 创建的 Gemini API Key。 |
 
 默认 SMTP 是 QQ 邮箱。如果使用其他邮箱，请修改 [`config/custom.yaml`](config/custom.yaml) 中的 `smtp_server` 和 `smtp_port`。
 
@@ -95,8 +94,7 @@ export NCBI_EMAIL=you@example.com
 export SENDER=...
 export RECEIVER=...
 export SENDER_PASSWORD=...
-export OPENAI_API_KEY=...
-export OPENAI_API_BASE=...
+export GEMINI_API_KEY=...
 uv run src/zotero_arxiv_daily/main.py
 ```
 
