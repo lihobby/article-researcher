@@ -35,8 +35,9 @@ interest:
 email:
   sender: ${oc.env:SENDER}
   receiver: ${oc.env:RECEIVER}
-  smtp_server: smtp.qq.com
-  smtp_port: 465
+  smtp_server: smtp.gmail.com
+  smtp_port: 587
+  smtp_security: starttls
   sender_password: ${oc.env:SENDER_PASSWORD}
   subject: "个性化科研文献推送 {date}"
 

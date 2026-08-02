@@ -24,7 +24,14 @@
 | `RECEIVER` | 是 | 收件邮箱。 |
 | `GEMINI_API_KEY` | 是 | Google AI Studio 创建的 Gemini API Key。 |
 
-默认 SMTP 是 QQ 邮箱。如果使用其他邮箱，请修改 [`config/custom.yaml`](config/custom.yaml) 中的 `smtp_server` 和 `smtp_port`。
+默认 SMTP 已配置为 Gmail：`smtp.gmail.com:587` + STARTTLS。`SENDER_PASSWORD` 必须填写 Google 账号生成的应用专用密码，而不是 Gmail 登录密码。
+
+使用 Gmail 发信前：
+
+1. 给 Google 账号开启两步验证。
+2. 在 Google 账号的“应用专用密码”页面创建一个新密码，可命名为 `GitHub Literature Daily`。
+3. 将生成的应用专用密码保存到 GitHub Secret `SENDER_PASSWORD`。
+4. 将完整 Gmail 地址保存到 `SENDER`，例如 `name@gmail.com`。
 
 不再需要 `ZOTERO_ID`、`ZOTERO_KEY` 或 Repository variable `CUSTOM_CONFIG`，除非主动切换回 Zotero 模式。
 

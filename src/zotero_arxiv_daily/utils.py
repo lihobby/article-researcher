@@ -3,6 +3,7 @@ import re
 import glob
 import math
 import smtplib
+import ssl
 from collections import Counter
 from email.header import Header
 from email.mime.text import MIMEText
@@ -156,16 +157,14 @@ def send_email(config:DictConfig, html:str):
     subject = config.email.get("subject", "Daily Research Papers {date}").format(date=today)
     msg['Subject'] = Header(subject, 'utf-8').encode()
 
-    try:
+    security = str(config.email.get("smtp_security", "starttls")).lower()
+    if security == "starttls":
         server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-    except Exception as e:
-        logger.debug(f"Failed to use TLS. {e}\nTry to use SSL.")
-        try:
-            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
-        except Exception as e:
-            logger.debug(f"Failed to use SSL. {e}\nTry to use plain text.")
-            server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls(context=ssl.create_default_context())
+    elif security == "ssl":
+        server = smtplib.SMTP_SSL(smtp_server, smtp_port, context=ssl.create_default_context())
+    else:
+        raise ValueError('email.smtp_security must be either "starttls" or "ssl"')
 
     server.login(sender, password)
     server.sendmail(sender, [receiver], msg.as_string())

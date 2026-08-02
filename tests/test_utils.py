@@ -133,57 +133,28 @@ def test_send_email_starttls_success(config, monkeypatch):
     assert "text/html" in body
 
 
-def test_send_email_falls_back_to_ssl(config, monkeypatch):
+def test_send_email_ssl_mode(config, monkeypatch):
+    from omegaconf import open_dict
+
     sent = []
-    call_count = {"smtp": 0}
-
     StubOK = make_stub_smtp(sent)
-
-    class StubSMTP_TLS_Fails:
-        def __init__(self, *a, **kw):
-            call_count["smtp"] += 1
-        def starttls(self):
-            raise OSError("TLS not supported")
-
     class StubSMTP_SSL(StubOK):
         pass
 
-    monkeypatch.setattr(smtplib, "SMTP", StubSMTP_TLS_Fails)
+    with open_dict(config.email):
+        config.email.smtp_security = "ssl"
     monkeypatch.setattr(smtplib, "SMTP_SSL", StubSMTP_SSL)
     send_email(config, "<html>ssl</html>")
     assert len(sent) == 1
 
 
-def test_send_email_falls_back_to_plain(config, monkeypatch):
-    sent = []
-    call_count = {"smtp": 0}
+def test_send_email_rejects_plain_mode(config):
+    from omegaconf import open_dict
 
-    StubOK = make_stub_smtp(sent)
-
-    class StubSMTP_TLS_Fails:
-        def __init__(self, *a, **kw):
-            call_count["smtp"] += 1
-            if call_count["smtp"] == 1:
-                pass  # first SMTP() call succeeds, but starttls will fail
-            else:
-                pass  # third SMTP() call is the plain fallback
-        def starttls(self):
-            raise OSError("TLS not supported")
-        def login(self, u, p):
-            pass
-        def sendmail(self, s, r, m):
-            sent.append((s, r, m))
-        def quit(self):
-            pass
-
-    class StubSMTP_SSL_Fails:
-        def __init__(self, *a, **kw):
-            raise OSError("SSL not supported")
-
-    monkeypatch.setattr(smtplib, "SMTP", StubSMTP_TLS_Fails)
-    monkeypatch.setattr(smtplib, "SMTP_SSL", StubSMTP_SSL_Fails)
-    send_email(config, "<html>plain</html>")
-    assert len(sent) == 1
+    with open_dict(config.email):
+        config.email.smtp_security = "plain"
+    with pytest.raises(ValueError, match="smtp_security"):
+        send_email(config, "<html>plain</html>")
 
 
 # ---------------------------------------------------------------------------
