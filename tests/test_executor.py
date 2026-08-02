@@ -10,6 +10,45 @@ from zotero_arxiv_daily.protocol import CorpusPaper
 
 
 # ---------------------------------------------------------------------------
+# manual interest profile
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_manual_interest_corpus(config):
+    from omegaconf import open_dict
+
+    with open_dict(config):
+        config.interest.provider = "manual"
+        config.interest.topics = [
+            {
+                "name": "Chemical proteomics",
+                "description": "Chemical probes for proteome-wide target identification.",
+                "weight": 1.0,
+            }
+        ]
+
+    executor = Executor.__new__(Executor)
+    executor.config = config
+    corpus = executor.fetch_interest_corpus()
+
+    assert len(corpus) == 10
+    assert corpus[0].title == "Chemical proteomics"
+    assert "proteome-wide" in corpus[0].abstract
+
+
+def test_manual_interest_requires_description(config):
+    from omegaconf import open_dict
+
+    with open_dict(config):
+        config.interest.topics = [{"name": "Chemical biology", "description": ""}]
+
+    executor = Executor.__new__(Executor)
+    executor.config = config
+    with pytest.raises(ValueError, match="description cannot be empty"):
+        executor.fetch_manual_interest_corpus()
+
+
+# ---------------------------------------------------------------------------
 # normalize_path_patterns — migrated from test_include_path.py
 # ---------------------------------------------------------------------------
 

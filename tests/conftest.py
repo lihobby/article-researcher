@@ -24,6 +24,7 @@ def _base_config():
         cfg = compose(
             config_name="default",
             overrides=[
+                "interest.provider=zotero",
                 "zotero.user_id=000000",
                 "zotero.api_key=fake-zotero-key",
                 "zotero.include_path=null",

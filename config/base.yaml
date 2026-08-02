@@ -1,3 +1,11 @@
+interest:
+  provider: manual # Use "manual" for topics below, or "zotero" for the original Zotero-based profile.
+  topics:
+    - name: Chemical biology
+      description: Chemical probes, biomolecular mechanisms, and chemical approaches for studying biological systems.
+      weight: 1.0
+  negative_topics: [] # Reserved for a later step; these topics will eventually lower a paper's score.
+
 zotero:
   user_id: ??? # User ID of your Zotero account.
   api_key: ??? # An Zotero API key with read access.
@@ -5,6 +13,12 @@ zotero:
   ignore_path: null # A list of glob patterns marking the Zotero collections that should be excluded. Example: ["2026/ignore/**","archive/**"]
 
 source:
+  pubmed:
+    journals: null # Full PubMed journal names, e.g. ["Nature Chemical Biology", "Journal of the American Chemical Society"]
+    lookback_days: 3 # Recheck a short overlap so delayed indexing is less likely to be missed.
+    email: null # Contact email requested by NCBI. Can use ${oc.env:NCBI_EMAIL}.
+    api_key: null # Optional NCBI API key. Can use ${oc.env:NCBI_API_KEY,null}.
+    max_results: 300
   arxiv:
     category: null # The categories of target arxiv papers. Find the abbr of your research area from [here](https://arxiv.org/category_taxonomy). Example: ["cs.AI","cs.CV","cs.LG","cs.CL"]
     include_cross_list: false # Whether to include arXiv cross-list papers in subscribed categories. Example: true

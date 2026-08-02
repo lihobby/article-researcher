@@ -3,7 +3,7 @@ from pyzotero import zotero
 from omegaconf import DictConfig, ListConfig
 from .utils import glob_match
 from .retriever import get_retriever_cls
-from .protocol import CorpusPaper
+from .protocol import CorpusPaper, InterestTopic
 import random
 from datetime import datetime
 from .reranker import get_reranker_cls
@@ -39,6 +39,56 @@ class Executor:
         }
         self.reranker = get_reranker_cls(config.executor.reranker)(config)
         self.openai_client = OpenAI(api_key=config.llm.api.key, base_url=config.llm.api.base_url)
+
+    def fetch_manual_interest_corpus(self) -> list[CorpusPaper]:
+        """Build a compatibility corpus from user-written research topics.
+
+        The current reranker compares candidate abstracts with a list of corpus
+        abstracts. Treating each topic description as a corpus abstract lets us
+        remove the Zotero requirement now without rewriting ranking in the same
+        step.
+        """
+        raw_topics = self.config.interest.get("topics", [])
+        topics: list[InterestTopic] = []
+        for index, item in enumerate(raw_topics):
+            name = str(item.get("name", "")).strip()
+            description = str(item.get("description", "")).strip()
+            weight = float(item.get("weight", 1.0))
+            if not name:
+                raise ValueError(f"interest.topics[{index}].name cannot be empty")
+            if not description:
+                raise ValueError(f"interest.topics[{index}].description cannot be empty")
+            if weight <= 0:
+                raise ValueError(f"interest.topics[{index}].weight must be greater than 0")
+            topics.append(InterestTopic(name=name, description=description, weight=weight))
+
+        # Repeat weighted topics so the existing weighted-average reranker can
+        # approximately respect user weights until the dedicated topic reranker
+        # is introduced in a later step.
+        corpus: list[CorpusPaper] = []
+        now = datetime.now()
+        for topic in topics:
+            repeat_count = max(1, round(topic.weight * 10))
+            corpus.extend(
+                CorpusPaper(
+                    title=topic.name,
+                    abstract=f"{topic.name}. {topic.description}",
+                    added_date=now,
+                    paths=["manual-interest"],
+                )
+                for _ in range(repeat_count)
+            )
+        logger.info(f"Loaded {len(topics)} manual research interests")
+        return corpus
+
+    def fetch_interest_corpus(self) -> list[CorpusPaper]:
+        provider = self.config.interest.get("provider", "manual")
+        if provider == "manual":
+            return self.fetch_manual_interest_corpus()
+        if provider == "zotero":
+            return self.filter_corpus(self.fetch_zotero_corpus())
+        raise ValueError('interest.provider must be either "manual" or "zotero"')
+
     def fetch_zotero_corpus(self) -> list[CorpusPaper]:
         logger.info("Fetching zotero corpus")
         zot = zotero.Zotero(self.config.zotero.user_id, 'user', self.config.zotero.api_key)
@@ -91,10 +141,9 @@ class Executor:
 
     
     def run(self):
-        corpus = self.fetch_zotero_corpus()
-        corpus = self.filter_corpus(corpus)
+        corpus = self.fetch_interest_corpus()
         if len(corpus) == 0:
-            logger.error(f"No zotero papers found. Please check your zotero settings:\n{self.config.zotero}")
+            logger.error("No research interests found. Please add at least one item to interest.topics.")
             return
         all_papers = []
         for source, retriever in self.retrievers.items():

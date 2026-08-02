@@ -1,7 +1,30 @@
-zotero:
-  user_id: ${oc.env:ZOTERO_ID}
-  api_key: ${oc.env:ZOTERO_KEY}
-  include_path: null # Or set a list of glob patterns, e.g. ["2026/survey/**","2026/reading-group/**"]
+interest:
+  provider: manual
+  topics:
+    - name: AI for Science
+      description:  Artificial intelligence and machine learning in protein design, peptide science, biomaterials, hydrogels, and disease diagnostics.
+      weight: 1.0
+    - name: Complex biological and computational systems
+      description: Complex systems, biological networks, intercellular communication, enzymatic networks, reservoir computing, nanowire networks, and DNA computing.
+      weight: 1.0
+    - name: Conductive polymers and soft electronics
+      description: Conducting polymers, polymeric semiconductors, bio-sensors, and flexible organic electronic devices.
+      weight: 1.0
+    - name: Advanced gels and soft matter
+      description: Hydrogels, ionogels, soft matter physics, polymer networks, material defects, and mechanical property optimization.
+      weight: 1.0
+    - name: Protein and peptide science
+      description: Protein engineering, peptide synthesis, structural biology, protein folding, and biomolecular interactions.
+      weight: 1.0
+    - name: Brain-computer interfaces and neural networks
+      description: Brain-computer interfaces (BCI), neural engineering, artificial neural networks, neuroprosthetics, and bio-inspired computing.
+      weight: 0.5
+    - name: Novel biological mechanisms
+      description: Emergent biological mechanisms, cellular signaling pathways, physiological discovery, and novel organisms or tissue functions.
+      weight: 0.5
+    - name: Biomimetic materials and bio-inspired science
+      description: Biomimetic materials, bio-inspired design, smart materials, biomimicry algorithms, and nature-inspired engineering.
+      weight: 0.5
 
 email:
   sender: ${oc.env:SENDER}
@@ -18,9 +41,62 @@ llm:
     model: gpt-4o-mini
 
 source:
-  arxiv:
-    category: ["cs.AI","cs.CV","cs.LG","cs.CL"]
+  pubmed:
+    journals:
+      - Nature Chemical Biology
+      - Journal of the American Chemical Society
+      - ACS Chemical Biology
+      - Cell Chemical Biology
+      - Nature Communications
+      - Chemical Science
+      - Angewandte Chemie International Edition
+      - Nature Chemistry
+      - Nature Methods
+      - Science
+      - Nature
+      - Cell
+      - Nature Machine Intelligence
+      - Nature Biomedical Engineering
+      - Nature Electronics
+      - Nature Computational Science
+      - Science Robotics
+      - Science Advances
+      - Cell Systems
+      - Matter
+      - Chem
+      - Angewandte Chemie International Edition
+      - Advanced Materials
+      - Advanced Functional Materials
+      - Advanced Electronic Materials
+      - ACS Nano
+      - Nano Letters
+      - Chemical Reviews
+      - Chemical Society Reviews
+      - Accounts of Chemical Research
+      - Macromolecules
+      - Biomacromolecules
+      - Progress in Polymer Science
+      - Soft Matter
+      - Biomaterials
+      - Acta Biomaterialia
+      - Biofabrication
+      - Advanced Healthcare Materials
+      - Journal of Neural Engineering
+      - IEEE Transactions on Biomedical Engineering
+      - Frontiers in Bioengineering and Biotechnology
+      - Bioinspiration & Biomimetics
+      - Physical Review Letters
+      - Physical Review E
+      - PNAS
+      - Bioinformatics
+      - Briefings in Bioinformatics
+
+      
+    lookback_days: 3
+    email: ${oc.env:NCBI_EMAIL}
+    api_key: ${oc.env:NCBI_API_KEY,null}
+    max_results: 300
 
 executor:
   debug: ${oc.env:DEBUG,null}
-  source: ['arxiv']
+  source: ['pubmed']

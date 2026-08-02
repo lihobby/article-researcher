@@ -9,6 +9,13 @@ import json
 RawPaperItem = TypeVar('RawPaperItem')
 
 @dataclass
+class InterestTopic:
+    """A research interest written and controlled by the user."""
+    name: str
+    description: str
+    weight: float = 1.0
+
+@dataclass
 class Paper:
     source: str
     title: str
@@ -20,6 +27,11 @@ class Paper:
     tldr: Optional[str] = None
     affiliations: Optional[list[str]] = None
     score: Optional[float] = None
+    journal: Optional[str] = None
+    publication_date: Optional[str] = None
+    doi: Optional[str] = None
+    pmid: Optional[str] = None
+    article_types: Optional[list[str]] = None
 
     def _generate_tldr_with_llm(self, openai_client:OpenAI,llm_params:dict) -> str:
         lang = llm_params.get('language', 'English')
