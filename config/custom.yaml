@@ -59,12 +59,13 @@ llm:
     prompt_template: |-
       请用{language}分析下面的论文，并严格使用以下小标题：
       【一句话结论】
+      【需要了解的背景知识】
       【研究问题】
-      【方法】
-      【核心发现】
+      【方法/材料和之前研究有何不同】
+      【核心发现/和之前研究的对比】
       【创新与价值】说明它为什么与“匹配兴趣”相关
       【局限与阅读建议】
-      总长度控制在500字以内，突出定量结果和真正的新意，避免泛泛复述背景。
+      无总字数长度限制，突出定量结果和真正的新意，避免泛泛复述背景。
 
       标题：{title}
       期刊：{journal}
@@ -141,6 +142,6 @@ executor:
   debug: ${oc.env:DEBUG,null}
   source: [pubmed, biorxiv, medrxiv, arxiv]
   max_paper_num: 18 # Keep two of the 20 daily Gemini requests in reserve.
-  min_score: 2.5
+  min_score: 1.5
   history_path: data/sent_history.json
   history_retention_days: 30
