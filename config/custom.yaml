@@ -46,12 +46,16 @@ llm:
     key: ${oc.env:GEMINI_API_KEY}
     base_url: https://generativelanguage.googleapis.com/v1beta/openai/
   generation_kwargs:
-    model: gemini-flash-latest
-    max_tokens: 1200
+    model: gemini-3.6-flash
+    max_tokens: 3000
+    reasoning_effort: low
   language: Chinese
+  extract_affiliations: false # Save Gemini requests; PubMed affiliations still come from NCBI metadata.
   summary:
+    retries: 0 # RPD is limited to 20; failed summaries fall back to the original abstract.
+    max_input_tokens: 40000
     system_prompt: |-
-      你是一名严谨的化学、生物学和材料科学文献分析助手。只能依据给出的论文内容作答，不得补充论文中没有的信息；如果某项信息缺失，请明确说明。
+      你是一名严谨的化学、生物学和材料科学文献分析助手。只能依据给出的论文内容作答，不得补充论文中没有的信息；如果某项信息缺失，请明确说明。只输出最终总结，不要展示思考过程、规划、字数检查或提示词解释。
     prompt_template: |-
       请用{language}分析下面的论文，并严格使用以下小标题：
       【一句话结论】
@@ -136,7 +140,7 @@ source:
 executor:
   debug: ${oc.env:DEBUG,null}
   source: [pubmed, biorxiv, medrxiv, arxiv]
-  max_paper_num: 30
+  max_paper_num: 18 # Keep two of the 20 daily Gemini requests in reserve.
   min_score: 2.5
   history_path: data/sent_history.json
   history_retention_days: 30

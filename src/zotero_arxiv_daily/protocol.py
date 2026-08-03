@@ -9,6 +9,10 @@ import json
 RawPaperItem = TypeVar('RawPaperItem')
 
 
+class SummaryGenerationError(RuntimeError):
+    """Raised when an LLM response cannot be used as a paper summary."""
+
+
 def _truncate_for_llm(text: str, max_tokens: int) -> str:
     """Truncate with tiktoken when available, with a network-free fallback."""
     try:
@@ -70,8 +74,8 @@ class Paper:
             logger.warning(f"Neither full text nor abstract is provided for {self.url}")
             return "Failed to generate TLDR. Neither full text nor abstract is provided"
         
-        # use gpt-4o tokenizer for estimation
-        prompt = _truncate_for_llm(prompt, 4000)
+        max_input_tokens = int(summary_config.get("max_input_tokens", 4000))
+        prompt = _truncate_for_llm(prompt, max_input_tokens)
         
         response = openai_client.chat.completions.create(
             messages=[
@@ -83,19 +87,37 @@ class Paper:
             ],
             **llm_params.get('generation_kwargs', {})
         )
-        tldr = response.choices[0].message.content
-        return tldr
+        if not response.choices:
+            raise SummaryGenerationError("Gemini returned no choices")
+        choice = response.choices[0]
+        finish_reason = getattr(choice, "finish_reason", None)
+        tldr = getattr(choice.message, "content", None)
+        if not isinstance(tldr, str) or not tldr.strip():
+            raise SummaryGenerationError(
+                f"Gemini returned empty content (finish_reason={finish_reason})"
+            )
+        if str(finish_reason).lower() in {"length", "max_tokens"}:
+            raise SummaryGenerationError(
+                f"Gemini output was truncated (finish_reason={finish_reason})"
+            )
+        return tldr.strip()
     
     def generate_tldr(self, openai_client:OpenAI,llm_params:dict) -> str:
-        try:
-            tldr = self._generate_tldr_with_llm(openai_client,llm_params)
-            self.tldr = tldr
-            return tldr
-        except Exception as e:
-            logger.warning(f"Failed to generate tldr of {self.url}: {e}")
-            tldr = self.abstract
-            self.tldr = tldr
-            return tldr
+        retry_count = int(llm_params.get("summary", {}).get("retries", 1))
+        for attempt in range(retry_count + 1):
+            try:
+                tldr = self._generate_tldr_with_llm(openai_client,llm_params)
+                self.tldr = tldr
+                return tldr
+            except Exception as exc:
+                logger.warning(
+                    f"Failed to generate TLDR for {self.url} "
+                    f"(attempt {attempt + 1}/{retry_count + 1}): {exc}"
+                )
+        fallback = self.abstract.strip() if self.abstract else "摘要生成失败，且文章没有可用摘要。"
+        logger.warning(f"Using abstract fallback for {self.url}")
+        self.tldr = fallback
+        return fallback
 
     def _generate_affiliations_with_llm(self, openai_client:OpenAI,llm_params:dict) -> Optional[list[str]]:
         if self.full_text is not None:

@@ -48,7 +48,10 @@ llm:
     max_tokens: 16384
     model: ???
   language: English # Preferred language for the TL;DR. Example: English
+  extract_affiliations: true # Disable to reserve LLM requests for summaries.
   summary:
+    retries: 1 # Retry once when the model returns empty or truncated output.
+    max_input_tokens: 4000
     system_prompt: You are an accurate scientific literature analyst. Do not invent facts absent from the paper.
     prompt_template: |-
       Summarize the paper in {language} using these sections: research question, methods,

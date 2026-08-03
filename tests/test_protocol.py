@@ -48,6 +48,46 @@ def test_tldr_falls_back_to_abstract_on_error(llm_params):
     assert result == paper.abstract
 
 
+def test_tldr_retries_after_empty_response(llm_params):
+    from types import SimpleNamespace
+
+    calls = {"count": 0}
+
+    def create(**kwargs):
+        calls["count"] += 1
+        content = None if calls["count"] == 1 else "Recovered summary"
+        return SimpleNamespace(
+            choices=[SimpleNamespace(
+                message=SimpleNamespace(content=content), finish_reason="stop"
+            )]
+        )
+
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create))
+    )
+    paper = make_sample_paper()
+    result = paper.generate_tldr(client, llm_params)
+    assert result == "Recovered summary"
+    assert calls["count"] == 2
+
+
+def test_tldr_falls_back_when_responses_are_truncated(llm_params):
+    from types import SimpleNamespace
+
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(
+            create=lambda **kwargs: SimpleNamespace(
+                choices=[SimpleNamespace(
+                    message=SimpleNamespace(content="Incomplete"), finish_reason="length"
+                )]
+            )
+        ))
+    )
+    paper = make_sample_paper()
+    result = paper.generate_tldr(client, llm_params)
+    assert result == paper.abstract
+
+
 def test_tldr_truncates_long_prompt(llm_params):
     client = make_stub_openai_client()
     paper = make_sample_paper(full_text="word " * 10000)

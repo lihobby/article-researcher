@@ -236,7 +236,7 @@ class Executor:
             logger.info("Generating TLDR and affiliations...")
             for p in tqdm(reranked_papers):
                 p.generate_tldr(self.openai_client, self.config.llm)
-                if p.affiliations is None:
+                if p.affiliations is None and self.config.llm.get("extract_affiliations", True):
                     p.generate_affiliations(self.openai_client, self.config.llm)
             if not reranked_papers and not self.config.executor.send_empty:
                 logger.info("No papers met the relevance threshold. No email will be sent.")
