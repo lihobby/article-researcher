@@ -1,6 +1,6 @@
 # Personalized Research Daily
 
-每天从 PubMed、bioRxiv、medRxiv 和 arXiv 获取新论文，按照手写研究兴趣排序，使用兼容 OpenAI API 的模型生成中文摘要，并通过邮件推送。Zotero 仍作为可选的兴趣来源保留，但默认不需要 Zotero。
+每天从 PubMed、bioRxiv、medRxiv 和 arXiv 获取新论文，按照手写研究兴趣排序，使用兼容 Gemini API 的模型生成中文摘要，并通过邮件推送。Zotero 仍作为可选的兴趣来源保留，但默认不需要 Zotero。
 
 ## 当前功能
 
